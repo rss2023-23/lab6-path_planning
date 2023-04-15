@@ -14,22 +14,22 @@ class PathPlan(object):
     """
     def __init__(self):
         self.odom_topic = rospy.get_param("~odom_topic")
-        self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.map_cb)
+        
+        self.map_sub = rospy.Subscriber("/map", OccupancyGrid, self.on_map_change)
         self.trajectory = LineTrajectory("/planned_trajectory")
-        self.goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_cb, queue_size=10)
+        self.goal_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.on_goal_change, queue_size=10)
         self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=10)
-        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odom_cb)
+        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.on_get_odometry)
 
 
-    def map_cb(self, msg):
+    def on_map_change(self, msg):
+        pass ## REMOVE AND FILL IN ##
+
+    def on_get_odometry(self, msg):
         pass ## REMOVE AND FILL IN ##
 
 
-    def odom_cb(self, msg):
-        pass ## REMOVE AND FILL IN ##
-
-
-    def goal_cb(self, msg):
+    def on_goal_change(self, msg):
         pass ## REMOVE AND FILL IN ##
 
     def plan_path(self, start_point, end_point, map):
