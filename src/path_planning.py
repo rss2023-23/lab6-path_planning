@@ -8,6 +8,8 @@ import rospkg
 import time, os
 from utils import LineTrajectory
 from tf.transformations import euler_from_quaternion
+import math
+import heapq
 
 class PathPlan(object):
     """ Listens for goal pose published by RViz and uses it to plan a path from
@@ -42,8 +44,8 @@ class PathPlan(object):
     def on_map_change(self, msg):
         # Gather map transformation
         self.map_info = msg.info
-        rotation_quaternion = self.map_info.orientation
-        rotation = euler_from_quaternion(rotation_quaternion.x, rotation_quaternion.y, rotation_quaternion.z, rotation_quaternion.w).z
+        rotation_quaternion = self.map_info.origin.orientation
+        rotation = euler_from_quaternion((rotation_quaternion.x, rotation_quaternion.y, rotation_quaternion.z, rotation_quaternion.w))[2]
         translation = self.map_info.origin.position
         self.map_transform = np.array([[np.cos(rotation), -np.sin(rotation), translation.x], [np.sin(rotation), np.cos(rotation), translation.y], [0, 0, 1]])
         self.map_transform_inverse = np.linalg.inv(self.map_transform)
@@ -58,23 +60,83 @@ class PathPlan(object):
 
     def on_get_odometry(self, msg):
         position = msg.pose.pose.position
-        self.start_location = (position.x, position.y)
+        self.start_location = self.real_to_pixel((position.y, position.x))
 
     def on_goal_change(self, msg):
         position = msg.pose.position
-        self.goal_location = (position.x, position.y)
+        self.goal_location = self.real_to_pixel((position.y, position.x))
 
-        if self.is_map_valid:
+        if self.is_map_valid and self.start_location != None:
             self.plan_path_search_based(self.start_location, self.goal_location, self.grid)
 
     def plan_path_search_based(self, start_point, end_point, map):
-        ## CODE FOR PATH PLANNING ##
+        # A* graph search as introduced in MIT 6.009
 
-        # publish trajectory
-        self.traj_pub.publish(self.trajectory.toPoseArray())
+        agenda = [(0,0,self.start_location)] # Priority queue of nodes to visit
+        seen = set() # Nodes that have already been visited
+        parents = {} # Maps nodes to where they came from
 
-        # visualize trajectory Markers
-        self.trajectory.publish_viz()
+        while agenda:
+            # Take next unfinished task
+            total_cost, distance, cell = heapq.heappop(agenda)
+            if cell in seen:
+                continue
+            seen.add(cell)
+
+
+            # If reached goal, terminate search
+            if cell == self.goal_location:
+                # Build best path
+                parent = self.goal_location
+                path = [parent]
+                while parent != None:
+                    parent = parents[parent]
+                    path.append(parent)
+                path = path[::-1]
+
+                # Create Trajectory 
+                #TODO: Improve with Dubian Curve
+                self.trajectory = LineTrajectory("/planned_trajectory")
+                for point in path:
+                    point_y = self.pixel_to_real(point[0])
+                    point_x = self.pixel_to_real(point[1])
+                    self.trajectory.addPoint(Point(point_x, point_y, 0))
+
+                # Publish trajectory
+                self.traj_pub.publish(self.trajectory.toPoseArray())
+
+                # Visualize trajectory Markers
+                self.trajectory.publish_viz()
+
+                rospy.loginfo("Path found and trajectory plotted")
+                break
+
+            # Gather neighbors
+            neighbors = []
+            for y in range(max(0, cell[0]-1), min(cell[0]+2, self.grid_height)):
+                for x in range(max(0, cell[1]-1), min(cell[1]+2, self.grid_width)):
+                    print(x,y)
+                    neighbor_y = cell[0] + y
+                    neighbor_x = cell[1] + x
+                    neighbor = (neighbor_y, neighbor_x)
+                    if neighbor not in seen and self.grid[neighbor_y, neighbor_x] == 0 : #Ensures no collision with obstacles
+                        neighbors.append(neighbor)
+
+            # Add neighbors to agenda
+            for neighbor in neighbors:
+                # Compute new costs
+                # Done through optimized Euclidean Distance function 
+                # https://stackoverflow.com/questions/37794849/efficient-and-precise-calculation-of-the-euclidean-distance
+                next_distance = distance + math.sqrt(sum([(a - b)**2 for a, b in zip(cell, neighbor)]))   
+                heuristic = math.sqrt(sum([(a - b)**2 for a, b in zip(neighbor, self.goal_location)]))    
+
+                # Add to agenda
+                parents[neighbor] = cell
+                heapq.heappush((next_distance+heuristic, next_distance, neighbor))
+
+        rospy.loginfo("Path Planning finished")
+
+
 
     def pixel_to_real(self, pixel_coords):
         pixel_vector = np.array([[pixel_coords[0]*self.map_info.resolution],[pixel_coords[1]*self.map_info.resolution],[1]])
@@ -84,7 +146,7 @@ class PathPlan(object):
     def real_to_pixel(self, real_coords):
         real_vector = np.array([[real_coords[0]],[real_coords[1]],[1]])
         pixel_vector = self.map_transform_inverse * real_vector
-        return (pixel_vector[0][0] / self.map_info.resolution, pixel_vector[1][0] / self.map_info.resolution)
+        return (int(pixel_vector[0][0] / self.map_info.resolution), int(pixel_vector[1][0] / self.map_info.resolution))
 
 if __name__=="__main__":
     rospy.init_node("path_planning")
