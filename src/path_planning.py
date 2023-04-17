@@ -139,12 +139,12 @@ class PathPlan(object):
 
     def pixel_to_real(self, pixel_coords):
         pixel_vector = np.array([[pixel_coords[1]*self.map_info.resolution],[pixel_coords[0]*self.map_info.resolution],[1]])
-        real_vector = self.map_transform * pixel_vector
+        real_vector = np.matmul(self.map_transform,pixel_vector)
         return (real_vector[1][0], real_vector[0][0])
 
     def real_to_pixel(self, real_coords):
         real_vector = np.array([[real_coords[1]],[real_coords[0]],[1]])
-        pixel_vector = self.map_transform_inverse * real_vector
+        pixel_vector = np.matmul(self.map_transform_inverse,real_vector)
         print(real_coords, (pixel_vector[1][0], pixel_vector[0][0]))
         return (int(pixel_vector[1][0] / self.map_info.resolution), int(pixel_vector[0][0] / self.map_info.resolution))
 
