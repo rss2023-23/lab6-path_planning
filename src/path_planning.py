@@ -59,8 +59,9 @@ class PathPlan(object):
         rospy.loginfo("Map Initialized")
 
     def on_get_odometry(self, msg):
-        position = msg.pose.pose.position
-        self.start_location = self.real_to_pixel((position.y, position.x))
+        if self.is_map_valid:
+            position = msg.pose.pose.position
+            self.start_location = self.real_to_pixel((position.y, position.x))
 
     def on_goal_change(self, msg):
         position = msg.pose.position
@@ -113,13 +114,11 @@ class PathPlan(object):
 
             # Gather neighbors
             neighbors = []
+            #print(cell, (max(0, cell[0]-1), min(cell[0]+2, self.grid_height)), (max(0, cell[1]-1), min(cell[1]+2, self.grid_width)), self.grid_height, self.grid_width)
             for y in range(max(0, cell[0]-1), min(cell[0]+2, self.grid_height)):
                 for x in range(max(0, cell[1]-1), min(cell[1]+2, self.grid_width)):
-                    print(x,y)
-                    neighbor_y = cell[0] + y
-                    neighbor_x = cell[1] + x
-                    neighbor = (neighbor_y, neighbor_x)
-                    if neighbor not in seen and self.grid[neighbor_y, neighbor_x] == 0 : #Ensures no collision with obstacles
+                    neighbor = (y, x)
+                    if neighbor not in seen and self.grid[y, x] == 0 : #Ensures no collision with obstacles
                         neighbors.append(neighbor)
 
             # Add neighbors to agenda
@@ -132,21 +131,22 @@ class PathPlan(object):
 
                 # Add to agenda
                 parents[neighbor] = cell
-                heapq.heappush((next_distance+heuristic, next_distance, neighbor))
+                heapq.heappush(agenda, (next_distance+heuristic, next_distance, neighbor))
 
         rospy.loginfo("Path Planning finished")
 
 
 
     def pixel_to_real(self, pixel_coords):
-        pixel_vector = np.array([[pixel_coords[0]*self.map_info.resolution],[pixel_coords[1]*self.map_info.resolution],[1]])
+        pixel_vector = np.array([[pixel_coords[1]*self.map_info.resolution],[pixel_coords[0]*self.map_info.resolution],[1]])
         real_vector = self.map_transform * pixel_vector
-        return (real_vector[0][0], real_vector[1][0])
+        return (real_vector[1][0], real_vector[0][0])
 
     def real_to_pixel(self, real_coords):
-        real_vector = np.array([[real_coords[0]],[real_coords[1]],[1]])
+        real_vector = np.array([[real_coords[1]],[real_coords[0]],[1]])
         pixel_vector = self.map_transform_inverse * real_vector
-        return (int(pixel_vector[0][0] / self.map_info.resolution), int(pixel_vector[1][0] / self.map_info.resolution))
+        print(real_coords, (pixel_vector[1][0], pixel_vector[0][0]))
+        return (int(pixel_vector[1][0] / self.map_info.resolution), int(pixel_vector[0][0] / self.map_info.resolution))
 
 if __name__=="__main__":
     rospy.init_node("path_planning")
