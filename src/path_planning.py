@@ -2,7 +2,7 @@
 
 import rospy
 import numpy as np
-from geometry_msgs.msg import PoseStamped, PoseArray
+from geometry_msgs.msg import PoseStamped, PoseArray, Point
 from nav_msgs.msg import Odometry, OccupancyGrid
 import rospkg
 import time, os
@@ -75,7 +75,7 @@ class PathPlan(object):
 
         agenda = [(0,0,self.start_location)] # Priority queue of nodes to visit
         seen = set() # Nodes that have already been visited
-        parents = {} # Maps nodes to where they came from
+        parents = {self.start_location: None} # Maps nodes to where they came from
 
         while agenda:
             # Take next unfinished task
@@ -89,19 +89,19 @@ class PathPlan(object):
             if cell == self.goal_location:
                 # Build best path
                 parent = self.goal_location
-                path = [parent]
+                path = []
                 while parent != None:
-                    parent = parents[parent]
                     path.append(parent)
+                    parent = parents[parent]
                 path = path[::-1]
 
                 # Create Trajectory 
                 #TODO: Improve with Dubian Curve
                 self.trajectory = LineTrajectory("/planned_trajectory")
+                print(path)
                 for point in path:
-                    point_y = self.pixel_to_real(point[0])
-                    point_x = self.pixel_to_real(point[1])
-                    self.trajectory.addPoint(Point(point_x, point_y, 0))
+                    point = self.pixel_to_real(point)
+                    self.trajectory.addPoint(Point(point[1], point[0], 0))
 
                 # Publish trajectory
                 self.traj_pub.publish(self.trajectory.toPoseArray())
@@ -145,7 +145,7 @@ class PathPlan(object):
     def real_to_pixel(self, real_coords):
         real_vector = np.array([[real_coords[1]],[real_coords[0]],[1]])
         pixel_vector = np.matmul(self.map_transform_inverse,real_vector)
-        print(real_coords, (pixel_vector[1][0], pixel_vector[0][0]))
+        #print(real_coords, (pixel_vector[1][0], pixel_vector[0][0]))
         return (int(pixel_vector[1][0] / self.map_info.resolution), int(pixel_vector[0][0] / self.map_info.resolution))
 
 if __name__=="__main__":
