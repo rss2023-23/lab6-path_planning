@@ -40,7 +40,7 @@ class PathPlan(object):
         self.goal_location = None
         self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.on_get_odometry)
         self.start_location = None
-        self.path_resolution = 1
+        self.path_resolution = 2
 
 
     def on_map_change(self, msg):
@@ -58,7 +58,7 @@ class PathPlan(object):
         self.grid = np.reshape(np.array(msg.data), (self.grid_height, self.grid_width))
 
         # Erode the map
-        self.grid = ndimage.binary_dilation(self.grid, iterations=14)
+        self.grid = ndimage.binary_dilation(self.grid, iterations=12)
 
         self.is_map_valid = True
         rospy.loginfo("Map Initialized")
