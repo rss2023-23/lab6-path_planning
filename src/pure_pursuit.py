@@ -60,7 +60,7 @@ class PurePursuit(object):
         map_pose.point.z = 0.0
 
         # Transform the pose from "map" frame to "robot" frame
-        robot_pose = self.tf_listener.transformPoint("/base_link_pf", map_pose)
+        robot_pose = self.tf_listener.transformPoint("/base_link", map_pose)
 
         # Access the transformed pose in robot coordinates
         robot_x = robot_pose.point.x
