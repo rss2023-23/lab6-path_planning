@@ -13,13 +13,13 @@ if __name__ == "__main__":
 
     pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1, latch=True)
     msg = PoseStamped()
-    msg.pose.pose.position.x = x
-    msg.pose.pose.position.y = y
+    msg.pose.position.x = x
+    msg.pose.position.y = y
     o = quaternion_from_euler(0,0,theta)
-    msg.pose.pose.orientation.x = o[0]
-    msg.pose.pose.orientation.y = o[1]
-    msg.pose.pose.orientation.z = o[2]
-    msg.pose.pose.orientation.w = o[3]
+    msg.pose.orientation.x = o[0]
+    msg.pose.orientation.y = o[1]
+    msg.pose.orientation.z = o[2]
+    msg.pose.orientation.w = o[3]
 
     pub.publish(msg)
     rospy.spin()
