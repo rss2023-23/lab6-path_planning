@@ -26,16 +26,6 @@ class PurePursuit(object):
         self.trajectory  = utils.LineTrajectory("/followed_trajectory")
         self.pose = None
 
-        # initialize subscribers
-        self.traj_sub = rospy.Subscriber("/trajectory/current", PoseArray, self.trajectory_callback, queue_size=1)
-        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odometry_callback, queue_size=1)
-        # self.transform_sub = rospy.Subscriber('/map_coordinates', PointStamped, self.transform_callback, queue_size=1)
-
-        self.tf_listener = tf.TransformListener()
-
-        # initialize publishers
-        self.drive_pub = rospy.Publisher("/drive", AckermannDriveStamped, queue_size=1)
-
         # odometry estimates
         self.x = 0
         self.y = 0
@@ -45,6 +35,16 @@ class PurePursuit(object):
         self.segment_index = 0
         self.tdex = 0
         self.steering_angle = None
+
+        # initialize subscribers
+        self.traj_sub = rospy.Subscriber("/trajectory/current", PoseArray, self.trajectory_callback, queue_size=1)
+        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odometry_callback, queue_size=1)
+        # self.transform_sub = rospy.Subscriber('/map_coordinates', PointStamped, self.transform_callback, queue_size=1)
+
+        self.tf_listener = tf.TransformListener()
+
+        # initialize publishers
+        self.drive_pub = rospy.Publisher("/drive", AckermannDriveStamped, queue_size=1)
 
 
     def map_to_robot_frame(self, map_vector):
