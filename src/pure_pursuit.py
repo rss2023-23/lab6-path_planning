@@ -87,7 +87,7 @@ class PurePursuit(object):
         if self.odometry_initialized == False:
             print("I haven't estimated my odometry yet")
 
-        while self.tdex < len(msg.poses) -0.1: # stop when we are 90% done with the last segment.
+        while self.tdex < len(msg.poses) - 1.01: # stop when lookahead point is 99% of the last segment.
             self.pursuit_algorithm()
         self.drive(0,self.steering_angle)
 
@@ -197,10 +197,10 @@ class PurePursuit(object):
         intersect1 = G1 + t1*V
         intersect2 = G1 + t2*V
 
-        curr_tdex = t1 + self.segment_index
+        self.tdex = t1 + self.segment_index
         # tdex has to grow in order to progress along path
         # if tdex is smaller than last tdex, command last steering angle
-        print("Current Tdex: " + str(curr_tdex) +  ' t: ' + str(t1) + 'index: ' + str(self.segment_index))
+        print("Current Tdex: " + str(self.tdex) +  ' t: ' + str(t1) + 'index: ' + str(self.segment_index))
         
 
         if (0 <= t1 <= 1):
