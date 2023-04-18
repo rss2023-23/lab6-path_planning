@@ -44,7 +44,8 @@ class PurePursuit(object):
         self.tf_listener = tf.TransformListener()
 
         # initialize publishers
-        self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/vesc/ackermann_cmd_mux/input/navigation"), AckermannDriveStamped, queue_size=1)
+        self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/drive"), AckermannDriveStamped, queue_size=1)
+        #self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/vesc/ackermann_cmd_mux/input/navigation"), AckermannDriveStamped, queue_size=1)
 
 
     def map_to_robot_frame(self, map_vector):
@@ -87,11 +88,8 @@ class PurePursuit(object):
         if self.odometry_initialized == False:
             rospy.loginfo("I haven't estimated my odometry yet")
 
-        rospy.loginfo("About to pursue")
         while self.tdex < len(msg.poses) - 1.01: # stop when lookahead point is 99% of the last segment.
-            rospy.loginfo("Pursuing")
             self.pursuit_algorithm()
-        rospy.loginfo("Reached end of line")
         self.drive(0,self.steering_angle)
 
     def pursuit_algorithm(self):
