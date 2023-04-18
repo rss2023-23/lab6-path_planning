@@ -79,7 +79,7 @@ class PathPlan(object):
 
         while agenda:
             # Take next unfinished task
-            total_cost, distance, cell = heapq.heappop(agenda)
+            _, distance, cell = heapq.heappop(agenda)
             if cell in seen:
                 continue
             seen.add(cell)
