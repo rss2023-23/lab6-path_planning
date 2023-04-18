@@ -37,8 +37,8 @@ class PurePursuit(object):
         self.steering_angle = None
 
         # initialize subscribers
-        self.traj_sub = rospy.Subscriber("/trajectory/current", PoseArray, self.trajectory_callback, queue_size=1)
-        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odometry_callback, queue_size=1)
+        self.traj_sub = rospy.Subscriber("/trajectory/current", PoseArray, self.trajectory_callback, queue_size=10)
+        self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.odometry_callback, queue_size=10)
         # self.transform_sub = rospy.Subscriber('/map_coordinates', PointStamped, self.transform_callback, queue_size=1)
 
         self.tf_listener = tf.TransformListener()

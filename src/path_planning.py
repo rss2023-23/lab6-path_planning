@@ -28,6 +28,7 @@ class PathPlan(object):
         # Trajectory handling
         self.trajectory = LineTrajectory("/planned_trajectory")
         self.traj_pub = rospy.Publisher("/trajectory/current", PoseArray, queue_size=10)
+        self.pose_array = None
 
         # Map handling
         self.grid = None
@@ -63,6 +64,11 @@ class PathPlan(object):
             position = msg.pose.pose.position
             self.start_location = self.real_to_pixel((position.y, position.x))
 
+        if self.pose_array:
+            # Publish and visualize trajectory
+            self.traj_pub.publish(self.pose_array)
+            self.trajectory.publish_viz()
+
     def on_goal_change(self, msg):
         position = msg.pose.position
         self.goal_location = self.real_to_pixel((position.y, position.x))
@@ -76,6 +82,7 @@ class PathPlan(object):
         agenda = [(0,0,self.start_location)] # Priority queue of nodes to visit
         seen = set() # Nodes that have already been visited
         parents = {self.start_location: None} # Maps nodes to where they came from
+        self.pose_array = None
 
         while agenda:
             # Take next unfinished task
@@ -102,11 +109,8 @@ class PathPlan(object):
                     point = self.pixel_to_real(point)
                     self.trajectory.addPoint(Point(point[1], point[0], 0))
 
-                # Publish trajectory
-                self.traj_pub.publish(self.trajectory.toPoseArray())
-
-                # Visualize trajectory Markers
-                self.trajectory.publish_viz()
+                # Save trajectory
+                self.pose_array = self.trajectory.toPoseArray()
 
                 rospy.loginfo("Path found and trajectory plotted")
                 break
