@@ -79,7 +79,7 @@ class PurePursuit(object):
     def trajectory_callback(self, msg):
         ''' Clears the currently followed trajectory, and loads the new one from the message
         '''
-        print("Receiving new trajectory:", len(msg.poses), "points")
+        rospy.loginfo("Receiving new trajectory:", len(msg.poses), "points")
         self.trajectory.clear()
         self.trajectory.fromPoseArray(msg)
         self.trajectory.publish_viz(duration=0.0)
