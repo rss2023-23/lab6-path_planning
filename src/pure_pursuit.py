@@ -79,7 +79,7 @@ class PurePursuit(object):
     def trajectory_callback(self, msg):
         ''' Clears the currently followed trajectory, and loads the new one from the message
         '''
-        rospy.loginfo("Receiving new trajectory: " + len(msg.poses) + " points")
+        rospy.loginfo("Receiving new trajectory: " + str(len(msg.poses)) + " points")
         self.trajectory.clear()
         self.trajectory.fromPoseArray(msg)
         self.trajectory.publish_viz(duration=0.0)
@@ -87,8 +87,11 @@ class PurePursuit(object):
         if self.odometry_initialized == False:
             rospy.loginfo("I haven't estimated my odometry yet")
 
+        rospy.loginfo("About to pursue")
         while self.tdex < len(msg.poses) - 1.01: # stop when lookahead point is 99% of the last segment.
+            rospy.loginfo("Pursuing")
             self.pursuit_algorithm()
+        rospy.loginfo("Reached end of line")
         self.drive(0,self.steering_angle)
 
     def pursuit_algorithm(self):
