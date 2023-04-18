@@ -98,7 +98,6 @@ class PathPlan(object):
                 # Create Trajectory 
                 #TODO: Improve with Dubian Curve
                 self.trajectory = LineTrajectory("/planned_trajectory")
-                print(path)
                 for point in path:
                     point = self.pixel_to_real(point)
                     self.trajectory.addPoint(Point(point[1], point[0], 0))
