@@ -48,8 +48,8 @@ class PurePursuit(object):
         self.tf_listener = tf.TransformListener()
 
         # initialize publishers
-        self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/drive"), AckermannDriveStamped, queue_size=1)
-        #self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/vesc/ackermann_cmd_mux/input/navigation"), AckermannDriveStamped, queue_size=1)
+        #self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/drive"), AckermannDriveStamped, queue_size=1)
+        self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/vesc/ackermann_cmd_mux/input/navigation"), AckermannDriveStamped, queue_size=1)
 
 
     def map_to_robot_frame(self, map_vector):
@@ -232,7 +232,7 @@ class PurePursuit(object):
         self.tdex = t1 + self.segment_index
         # tdex has to grow in order to progress along path
         # if tdex is smaller than last tdex, command last steering angle
-        print("Current Tdex: " + str(self.tdex) +  ' t: ' + str(t1) + 'index: ' + str(self.segment_index))
+        #print("Current Tdex: " + str(self.tdex) +  ' t: ' + str(t1) + 'index: ' + str(self.segment_index))
         
 
         if (0 <= t1 <= 1):
@@ -242,7 +242,7 @@ class PurePursuit(object):
         #     print('Returning t2')
         #     return True, intersect2
         else:
-            print("Line segment misses the circle entirely: But would hit if extended")
+            #print("Line segment misses the circle entirely: But would hit if extended")
             return False, None
 
     def odometry_callback(self, msg):
@@ -265,6 +265,7 @@ class PurePursuit(object):
         """
         Publishes AckermannDriveStamped msg with speed, steering_angle, and steering_angle_velocity
         """
+        print("issued drive")
         # create drive object
         ack_drive = AckermannDrive()
         ack_drive.speed = speed
