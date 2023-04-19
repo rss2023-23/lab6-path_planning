@@ -77,7 +77,6 @@ class PathPlan(object):
 
     def plan_path_search_based(self, start_point, end_point, map):
         # A* graph search as introduced in MIT 6.009
-
         agenda = [(0,0,self.start_location)] # Priority queue of nodes to visit
         seen = set() # Nodes that have already been visited
         parents = {self.start_location: None} # Maps nodes to where they came from
@@ -88,7 +87,6 @@ class PathPlan(object):
             if cell in seen:
                 continue
             seen.add(cell)
-
 
             # If reached goal, terminate search
             if cell == self.goal_location:
@@ -140,7 +138,6 @@ class PathPlan(object):
                 heapq.heappush(agenda, (next_distance+heuristic, next_distance, neighbor))
 
         rospy.loginfo("Path Planning finished")
-
 
 
     def pixel_to_real(self, pixel_coords):
