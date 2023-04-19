@@ -58,7 +58,7 @@ class PathPlan(object):
         self.grid = np.reshape(np.array(msg.data), (self.grid_height, self.grid_width))
 
         # Erode the map
-        self.grid = ndimage.binary_dilation(self.grid, iterations=12)
+        self.grid = ndimage.binary_dilation(self.grid, iterations=14)
 
         self.is_map_valid = True
         rospy.loginfo("Map Initialized")
