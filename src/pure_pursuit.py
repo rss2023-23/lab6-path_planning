@@ -20,8 +20,8 @@ class PurePursuit(object):
     """
     def __init__(self):
         self.odom_topic       = rospy.get_param("~odom_topic")
-        self.lookahead        = rospy.get_param('lookahead',1)
-        self.speed            = rospy.get_param('VELOCITY', 1)
+        self.lookahead        = rospy.get_param('lookahead',1.0)
+        self.speed            = rospy.get_param('VELOCITY', 1.0)
         self.wheelbase_length = 0.325
         self.trajectory  = utils.LineTrajectory("/followed_trajectory")
         self.pose = None
