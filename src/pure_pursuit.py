@@ -35,6 +35,10 @@ class PurePursuit(object):
         self.segment_index = 0
         self.tdex = 0
         self.steering_angle = None
+        self.num_segments = None
+
+        # points initialization
+        self.points = None
 
         # initialize subscribers
         self.traj_sub = rospy.Subscriber("/trajectory/current", PoseArray, self.trajectory_callback, queue_size=10)
@@ -68,6 +72,8 @@ class PurePursuit(object):
         robot_y = robot_pose.point.y
         robot_z = robot_pose.point.z
 
+        
+
         # Print the transformed pose in robot coordinates
         # print("Point Position in Robot Coordinates:")
         # print("X: {}".format(robot_x))
@@ -88,25 +94,38 @@ class PurePursuit(object):
         if self.odometry_initialized == False:
             rospy.loginfo("I haven't estimated my odometry yet")
 
+        # print('\n')
+        # for point in np.array(self.trajectory.points):
+        #     print(point)
+        # print('\n')
+
+        self.points = np.array(self.trajectory.points)
+        self.num_segments = len(self.points) - 1
+        
         while self.tdex < len(msg.poses) - 1.01: # stop when lookahead point is 99% of the last segment.
             self.pursuit_algorithm()
         self.drive(0,self.steering_angle)
 
     def pursuit_algorithm(self):
-        (G1, G2, Q) = self.closest_point_faster()
-
+        '''
+        Pursuit algorithm
+        
+        '''
+        self.search_segment_index()
 
         # use in case of suspicious segment chosen
         # print("P1: " + str(G1) + " P2: " + str(G2) + " Odometry: " + str(Q))
+        for index in range(self.segment_index, self.num_segments):
+            (G1, G2, Q) = self.obtain_segment(index)
+            (success_marker, lookahead_vector) = self.find_lookahead(G1, G2, Q)
+            if success_marker:
+                # goal_vector is in map coordinates. Need to translate to robot coordinates.
+                # print("Lookahead Point" + str(lookahead_vector))
+                goal_vector_robot_coords = self.map_to_robot_frame(lookahead_vector)
+                self.pure_pursuit(goal_vector_robot_coords)
+                break
 
-        (success_marker, lookahead_vector) = self.find_lookahead(G1, G2, Q)
-        if success_marker:
-            # goal_vector is in map coordinates. Need to translate to robot coordinates.
-            # print("Lookahead Point" + str(lookahead_vector))
-            goal_vector_robot_coords = self.map_to_robot_frame(lookahead_vector)
-            self.pure_pursuit(goal_vector_robot_coords)
-
-    def closest_point_faster(self):
+    def search_segment_index(self):
         '''
         Faster (hopefully) implimentation of finding nearest trajectory to car.
         Returns three points, G1, G2, Q in [x, y]. 
@@ -114,13 +133,15 @@ class PurePursuit(object):
         Q is the current position of the robot in [x,y]
         '''
         # for testing
-        num_points = len(self.trajectory.points)
-        points = np.array(self.trajectory.points)
-        P1 = points[0:-1, :]
+        # num_points = len(self.trajectory.points)
+        # points = np.array(self.trajectory.points)
+        # print(np.shape(points))
+
+        P1 = self.points[0:-1, :]
         p1x = P1[:, 0]
         p1y = P1[:, 1]
 
-        P2 = points[1:, :]
+        P2 = self.points[1:, :]
         p2x = P2[:, 0]
         p2y = P2[:, 1]
         
@@ -144,9 +165,18 @@ class PurePursuit(object):
 
         self.segment_index = np.argmin(distances_from_curr_pos)
 
+    def obtain_segment(self, index):
+        P1 = self.points[0:-1, :]
+        p1x = P1[:, 0]
+        p1y = P1[:, 1]
+
+        P2 = self.points[1:, :]
+        p2x = P2[:, 0]
+        p2y = P2[:, 1]
+
         # goal points defining closest line segment
-        g1x, g1y = p1x[self.segment_index], p1y[self.segment_index]
-        g2x, g2y = p2x[self.segment_index], p2y[self.segment_index]
+        g1x, g1y = p1x[index], p1y[index]
+        g2x, g2y = p2x[index], p2y[index]
 
         G1 = np.array([g1x, g1y])
         G2 = np.array([g2x, g2y])
