@@ -20,8 +20,8 @@ class PurePursuit(object):
     """
     def __init__(self):
         self.odom_topic       = rospy.get_param("~odom_topic")
-        self.lookahead        = rospy.get_param('lookahead',0.5)
-        self.speed            = rospy.get_param('VELOCITY', 0.3)
+        self.lookahead        = rospy.get_param('lookahead',1)
+        self.speed            = rospy.get_param('VELOCITY', 1)
         self.wheelbase_length = 0.325
         self.trajectory  = utils.LineTrajectory("/followed_trajectory")
         self.pose = None
@@ -105,6 +105,7 @@ class PurePursuit(object):
         while self.tdex < len(msg.poses) - 1.01: # stop when lookahead point is 99% of the last segment.
             self.pursuit_algorithm()
         self.drive(0,self.steering_angle)
+        self.tdex = 0
 
     def pursuit_algorithm(self):
         '''
