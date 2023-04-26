@@ -12,15 +12,6 @@ import math
 import heapq
 from scipy import ndimage
 
-EXPLORATION_BIAS = 0.1
-MIN_VERTICES = 100
-TOTAL_SIZE = 1000
-STEP_SIZE = 30  # eta
-NUM_DIM = 2  # d
-MU_X_FREE = TOTAL_SIZE ** NUM_DIM # Lebesgue measure of X_free space, upper bounded by X_sample
-ZETA_DIM = math.pi * 1 * 1 #area of ball in d dimensions
-GAMMA_RRT_STAR = 2 * ((1 + 1/NUM_DIM) * MU_X_FREE / ZETA_DIM)**(1/NUM_DIM)
-
 class PathPlan(object):
     """ Listens for goal pose published by RViz and uses it to plan a path from
     current car pose.
@@ -50,8 +41,6 @@ class PathPlan(object):
         self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.on_get_odometry)
         self.start_location = None
         self.path_resolution = 2
-        
-        self.init_RRT_vars()
 
     def init_RRT_vars(self):
         self.V_adj = {self.start_location: set()}
@@ -59,6 +48,14 @@ class PathPlan(object):
         self.costs = {self.start_location: 0}
         # self.p_best_in_target = None
         # self.cur_total_cost = None
+        self.exploration_bias = 0.1
+        self.min_vertices = 1000
+        self.total_size = (self.grid_height + self.grid_width + 1) // 2
+        self.step_size = int(math.sqrt(self.total_size))  # eta
+        self.NUM_DIM = 2  # d
+        self.MU_X_FREE = self.total_size ** self.NUM_DIM # Lebesgue measure of X_free space, upper bounded by X_sample
+        self.ZETA_DIM = math.pi * 1 * 1 #area of ball in d dimensions
+        self.GAMMA_RRT_STAR = 2 * ((1 + 1/self.NUM_DIM) * self.MU_X_FREE / self.ZETA_DIM)**(1/self.NUM_DIM)
 
     def on_map_change(self, msg):
         # Gather map transformation
@@ -90,13 +87,13 @@ class PathPlan(object):
         self.goal_location = self.real_to_pixel((position.y, position.x))
 
         if self.is_map_valid and self.start_location != None:
-            self.plan_path_search_based()
+            self.plan_path_sample_based()
 
     def plan_path_sample_based(self):
         # RRT* graph search as introduced in https://arxiv.org/pdf/1105.1186.pdf
         self.init_RRT_vars()
         num_vertices = 0
-        while self.goal_location not in self.V_adj and num_vertices < MIN_VERTICES:
+        while self.goal_location not in self.V_adj or num_vertices < self.min_vertices:
             self.add_vertex_RRT_Star()
             num_vertices += 1
         self.publish_path_to_goal()
@@ -112,7 +109,7 @@ class PathPlan(object):
         return self.distance(p1, p2)
 
     def get_nearest(self, goal_point):   # O(num vertices in V)
-        min_dist = TOTAL_SIZE * 2
+        min_dist = self.grid_height + self.grid_width
         min_v = (-1,-1)
         for v in self.V_adj:
             d = self.distance(v, goal_point)
@@ -127,14 +124,14 @@ class PathPlan(object):
     def point_along_at(self, p1, p2, proportion):
         p_new = tuple()
         for i in [0,1]:
-            p_new += (p1[i] + proportion * (p2[i] - p1[i]),)
+            p_new += (int(p1[i] + proportion * (p2[i] - p1[i])),)
         return p_new
     
     def move_towards(self, p_i, p_f):  # O(1)
         line_length = self.distance(p_i, p_f)
-        if line_length <= STEP_SIZE:
+        if line_length <= self.step_size:
             return p_f
-        proportion = STEP_SIZE / line_length
+        proportion = self.step_size / line_length
         return self.point_along_at(p_i, p_f, proportion)
     
     def line_is_within_map(self, p1, p2):
@@ -148,7 +145,7 @@ class PathPlan(object):
 
         # Check if all the cells along the line are unoccupied
         for i in range(len(x)):
-            if map[y[i], x[i]] != 0:
+            if self.grid[y[i], x[i]] != 0:
                 return False
 
         return True
@@ -160,21 +157,21 @@ class PathPlan(object):
                 self.update_costs(neighbor)
 
     def add_vertex_RRT_Star(self):   # O(num nodes)
-        rospy.loginfo("Add")
+        # rospy.loginfo("Add")
         # Choose random point within the map bounds
         while True:
             p_random = (np.random.randint(0, self.grid_height),
                         np.random.randint(0, self.grid_width))
             if self.is_within_map(p_random):
                 break
-        if np.random.uniform() < EXPLORATION_BIAS:
+        if np.random.uniform() < self.exploration_bias:
             p_random = self.goal_location
 
         # Create new point by moving towards the chosen random point
         p_nearest = self.get_nearest(p_random)
         p_new = self.move_towards(p_nearest, p_random)
         if p_new not in self.V_adj and self.line_is_within_map(p_nearest, p_new):
-            RRT_Star = min(GAMMA_RRT_STAR * (math.log(len(self.V_adj)) / len(self.V_adj))**(1/NUM_DIM), 2.5*STEP_SIZE)
+            RRT_Star = min(self.GAMMA_RRT_STAR * (math.log(len(self.V_adj)) / len(self.V_adj))**(1/self.NUM_DIM), 2.5*self.step_size)
             P_near = self.get_near(p_new, RRT_Star)
 
             # Find minimum cost to reach p_new
@@ -210,23 +207,25 @@ class PathPlan(object):
     #         self.path_to_goal(self.p_best_in_target)
     
     def publish_path_to_goal(self):
+        rospy.loginfo("Goal")
+        rospy.loginfo("{} {}".format(self.grid_height, self.grid_width))
         # Construct path in reverse using parents dict
         # Precondition: Goal location must have been found using RRT*
         path = []
         cur = self.goal_location
-        while cur is not self.start_location:
+        while cur != self.start_location:
             path.append(cur)
             cur = self.parents[cur]
-        path.append(self.start)
+            rospy.loginfo(cur)
+        path.append(self.start_location)
         path.reverse()
+        rospy.loginfo("Here")
 
         self.trajectory = LineTrajectory("/planned_trajectory")
-        index = 0
-        while index+self.path_resolution < len(path):
-            index += self.path_resolution
-            point = self.pixel_to_real(path[index])
+        for path_point in path:
+            point = self.pixel_to_real(path_point)
             self.trajectory.addPoint(Point(point[1], point[0], 0))
-
+        
         # Publish trajectory
         self.traj_pub.publish(self.trajectory.toPoseArray())
 
