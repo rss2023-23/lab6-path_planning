@@ -49,7 +49,7 @@ class PurePursuit(object):
 
         # initialize publishers
         #self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/drive"), AckermannDriveStamped, queue_size=1)
-        self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/vesc/ackermann_cmd_mux/input/navigation"), AckermannDriveStamped, queue_size=1)
+        self.drive_pub = rospy.Publisher(rospy.get_param("~drive_topic", "/drive"), AckermannDriveStamped, queue_size=1)
 
 
     def map_to_robot_frame(self, map_vector):
