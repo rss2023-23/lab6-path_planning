@@ -10,6 +10,7 @@ from utils import LineTrajectory
 from tf.transformations import euler_from_quaternion
 import math
 import heapq
+from scipy import ndimage
 
 class PathPlan(object):
     """ Listens for goal pose published by RViz and uses it to plan a path from
@@ -39,6 +40,7 @@ class PathPlan(object):
         self.goal_location = None
         self.odom_sub = rospy.Subscriber(self.odom_topic, Odometry, self.on_get_odometry)
         self.start_location = None
+        self.path_resolution = 2
 
 
     def on_map_change(self, msg):
@@ -54,6 +56,9 @@ class PathPlan(object):
         self.grid_height = msg.info.height
         self.grid_width = msg.info.width
         self.grid = np.reshape(np.array(msg.data), (self.grid_height, self.grid_width))
+
+        # Erode the map
+        self.grid = ndimage.binary_dilation(self.grid, iterations=14)
 
         self.is_map_valid = True
         rospy.loginfo("Map Initialized")
@@ -72,18 +77,16 @@ class PathPlan(object):
 
     def plan_path_search_based(self, start_point, end_point, map):
         # A* graph search as introduced in MIT 6.009
-
         agenda = [(0,0,self.start_location)] # Priority queue of nodes to visit
         seen = set() # Nodes that have already been visited
         parents = {self.start_location: None} # Maps nodes to where they came from
 
         while agenda:
             # Take next unfinished task
-            total_cost, distance, cell = heapq.heappop(agenda)
+            _, distance, cell = heapq.heappop(agenda)
             if cell in seen:
                 continue
             seen.add(cell)
-
 
             # If reached goal, terminate search
             if cell == self.goal_location:
@@ -98,9 +101,10 @@ class PathPlan(object):
                 # Create Trajectory 
                 #TODO: Improve with Dubian Curve
                 self.trajectory = LineTrajectory("/planned_trajectory")
-                print(path)
-                for point in path:
-                    point = self.pixel_to_real(point)
+                index = 0
+                while index+self.path_resolution < len(path):
+                    index += self.path_resolution
+                    point = self.pixel_to_real(path[index])
                     self.trajectory.addPoint(Point(point[1], point[0], 0))
 
                 # Publish trajectory
@@ -134,7 +138,6 @@ class PathPlan(object):
                 heapq.heappush(agenda, (next_distance+heuristic, next_distance, neighbor))
 
         rospy.loginfo("Path Planning finished")
-
 
 
     def pixel_to_real(self, pixel_coords):

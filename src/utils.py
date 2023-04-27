@@ -186,7 +186,7 @@ class LineTrajectory(object):
 
     def publish_trajectory(self, duration=0.0):
         should_publish = len(self.points) > 1
-        if self.visualize and self.traj_pub.get_num_connections() > 0:
+        if True:
             print "Publishing trajectory"
             marker = Marker()
             marker.header = self.make_header("/map")
