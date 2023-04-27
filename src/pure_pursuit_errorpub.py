@@ -20,7 +20,7 @@ class PurePursuit(object):
     """ Implements Pure Pursuit trajectory tracking with a fixed lookahead and speed.
     """
     def __init__(self):
-        self.odom_topic       = rospy.get_param("~odom_topic")
+        self.odom_topic       = rospy.get_param("~odom_topic", "/odom")
         self.lookahead        = rospy.get_param('lookahead',0.5)
         self.speed            = rospy.get_param('VELOCITY', 0.3)
         self.wheelbase_length = 0.325
@@ -63,12 +63,20 @@ class PurePursuit(object):
         map_pose.point.z = 0.0
 
         # Transform the pose from "map" frame to "robot" frame
-        robot_pose = self.tf_listener.transformPoint("/base_link_pf", map_pose)
+        robot_pose = self.tf_listener.transformPoint("/base_link", map_pose)
 
         # Access the transformed pose in robot coordinates
         robot_x = robot_pose.point.x
         robot_y = robot_pose.point.y
         robot_z = robot_pose.point.z
+
+        
+
+        # Print the transformed pose in robot coordinates
+        # print("Point Position in Robot Coordinates:")
+        # print("X: {}".format(robot_x))
+        # print("Y: {}".format(robot_y))
+        # print("Z: {}".format(robot_z))
 
         return [robot_x, robot_y]
 
@@ -76,36 +84,48 @@ class PurePursuit(object):
     def trajectory_callback(self, msg):
         ''' Clears the currently followed trajectory, and loads the new one from the message
         '''
-        print("Receiving new trajectory:", len(msg.poses), "points")
+        rospy.loginfo("Receiving new trajectory: " + str(len(msg.poses)) + " points")
         self.trajectory.clear()
         self.trajectory.fromPoseArray(msg)
         self.trajectory.publish_viz(duration=0.0)
 
         if self.odometry_initialized == False:
-            print("I haven't estimated my odometry yet")
+            rospy.loginfo("I haven't estimated my odometry yet")
 
+        # print('\n')
+        # for point in np.array(self.trajectory.points):
+        #     print(point)
+        # print('\n')
+
+        self.points = np.array(self.trajectory.points)
+        self.num_segments = len(self.points) - 1
+        
         while self.tdex < len(msg.poses) - 1.01: # stop when lookahead point is 99% of the last segment.
             self.pursuit_algorithm()
         self.drive(0,self.steering_angle)
+        self.tdex = 0
 
     def pursuit_algorithm(self):
-        (G1, G2, Q) = self.closest_point_faster()
-
+        '''
+        Pursuit algorithm
+        
+        '''
+        self.search_segment_index()
 
         # use in case of suspicious segment chosen
         # print("P1: " + str(G1) + " P2: " + str(G2) + " Odometry: " + str(Q))
+        for index in range(self.segment_index, self.num_segments):
+            (G1, G2, Q) = self.obtain_segment(index)
+            (success_marker, lookahead_vector) = self.find_lookahead(G1, G2, Q)
+            if success_marker:
+                # goal_vector is in map coordinates. Need to translate to robot coordinates.
+                # print("Lookahead Point" + str(lookahead_vector))
+                goal_vector_robot_coords = self.map_to_robot_frame(lookahead_vector)
+                self.pure_pursuit(goal_vector_robot_coords)
+                self.error_publisher(self.goal_vector_robot_coords)
+                break
 
-        (success_marker, lookahead_vector) = self.find_lookahead(G1, G2, Q)
-        if success_marker:
-            # goal_vector is in map coordinates. Need to translate to robot coordinates.
-            # print("Lookahead Point" + str(lookahead_vector))
-            self.goal_vector_robot_coords = self.map_to_robot_frame(lookahead_vector)
-            self.pure_pursuit(self.goal_vector_robot_coords)
-
-            self.error_publisher(self.goal_vector_robot_coords)
-
-
-    def closest_point_faster(self):
+    def search_segment_index(self):
         '''
         Faster (hopefully) implimentation of finding nearest trajectory to car.
         Returns three points, G1, G2, Q in [x, y]. 
@@ -113,13 +133,15 @@ class PurePursuit(object):
         Q is the current position of the robot in [x,y]
         '''
         # for testing
-        num_points = len(self.trajectory.points)
-        points = np.array(self.trajectory.points)
-        P1 = points[0:-1, :]
+        # num_points = len(self.trajectory.points)
+        # points = np.array(self.trajectory.points)
+        # print(np.shape(points))
+
+        P1 = self.points[0:-1, :]
         p1x = P1[:, 0]
         p1y = P1[:, 1]
 
-        P2 = points[1:, :]
+        P2 = self.points[1:, :]
         p2x = P2[:, 0]
         p2y = P2[:, 1]
         
@@ -143,28 +165,24 @@ class PurePursuit(object):
 
         self.segment_index = np.argmin(distances_from_curr_pos)
 
+    def obtain_segment(self, index):
+        P1 = self.points[0:-1, :]
+        p1x = P1[:, 0]
+        p1y = P1[:, 1]
+
+        P2 = self.points[1:, :]
+        p2x = P2[:, 0]
+        p2y = P2[:, 1]
+
         # goal points defining closest line segment
-        g1x, g1y = p1x[self.segment_index], p1y[self.segment_index]
-        g2x, g2y = p2x[self.segment_index], p2y[self.segment_index]
+        g1x, g1y = p1x[index], p1y[index]
+        g2x, g2y = p2x[index], p2y[index]
 
         G1 = np.array([g1x, g1y])
         G2 = np.array([g2x, g2y])
         Q = np.array([self.x, self.y])
         return (G1, G2, Q)
     
-    def error_publisher(self, goal_vector_robot_coords):
-        """
-        Publish the error between the car and the cone. We will view this
-        with rqt_plot to plot the success of the controller
-        """
-        error_msg = ParkingError()
-
-        # Populate error_msg with relative_x, relative_y, sqrt(x^2+y^2)
-        error_msg.x_error = goal_vector_robot_coords[0]
-        error_msg.y_error = goal_vector_robot_coords[1]
-        error_msg.distance_error = math.sqrt(goal_vector_robot_coords[0]**2 + goal_vector_robot_coords[1]**2)
-        
-        self.error_pub.publish(error_msg)
 
     def pure_pursuit(self, goal_vector_robot_coords):
         """
@@ -196,6 +214,8 @@ class PurePursuit(object):
         b = 2*np.dot(V, G1-Q)
         c = np.dot(G1, G1) + np.dot(Q, Q) - 2* np.dot(G1, Q) - r**2
 
+        # print('a: ' + str(a) +' b: ' + str(b) +' c: ' + str(c))
+
         disc = b**2 - 4 * a * c
         if disc < 0:
             print("Discrimenant is negative: Line misses the circle entirely")
@@ -211,7 +231,7 @@ class PurePursuit(object):
         self.tdex = t1 + self.segment_index
         # tdex has to grow in order to progress along path
         # if tdex is smaller than last tdex, command last steering angle
-        print("Current Tdex: " + str(self.tdex) +  ' t: ' + str(t1) + 'index: ' + str(self.segment_index))
+        #print("Current Tdex: " + str(self.tdex) +  ' t: ' + str(t1) + 'index: ' + str(self.segment_index))
         
 
         if (0 <= t1 <= 1):
@@ -221,7 +241,7 @@ class PurePursuit(object):
         #     print('Returning t2')
         #     return True, intersect2
         else:
-            print("Line segment misses the circle entirely: But would hit if extended")
+            #print("Line segment misses the circle entirely: But would hit if extended")
             return False, None
 
     def odometry_callback(self, msg):
@@ -244,6 +264,7 @@ class PurePursuit(object):
         """
         Publishes AckermannDriveStamped msg with speed, steering_angle, and steering_angle_velocity
         """
+        print("issued drive")
         # create drive object
         ack_drive = AckermannDrive()
         ack_drive.speed = speed
@@ -254,7 +275,23 @@ class PurePursuit(object):
         ack_stamp.drive = ack_drive
         self.drive_pub.publish(ack_stamp)
 
+
+    def error_publisher(self, goal_vector_robot_coords):
+        """
+        Publish the error between the car and the cone. We will view this
+        with rqt_plot to plot the success of the controller
+        """
+        error_msg = ParkingError()
+
+        # Populate error_msg with relative_x, relative_y, sqrt(x^2+y^2)
+        error_msg.x_error = goal_vector_robot_coords[0]
+        error_msg.y_error = goal_vector_robot_coords[1]
+        error_msg.distance_error = math.sqrt(goal_vector_robot_coords[0]**2 + goal_vector_robot_coords[1]**2)
+        
+        self.error_pub.publish(error_msg)
+
 if __name__=="__main__":
     rospy.init_node("pure_pursuit")
     pf = PurePursuit()
     rospy.spin()
+
